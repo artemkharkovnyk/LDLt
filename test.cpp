@@ -1,22 +1,40 @@
-#include <gtest/gtest.h>
-#include "LDLt.h" // file with implementation
+#define CATCH_CONFIG_MAIN
+#include <catch2/catch.hpp>
+#include <Eigen>
+#include "choleskydecomposition.h"
 
+TEST_CASE("cholesky decomposition", "cholesky decomposition") {
+	int size = 10;
 
-TEST() {
-    Halide::Buffer<float> A(5, 5)
-    A(0, 0) = 1.68830688; A(0, 1) = 1.31307667; A(0, 2) = 1.79536083; A(0, 3) = 0.94927581; A(0, 4) =0.77399403;
-    A(1, 0) = 1.31307667; A(1, 1) = 1.52180292; A(1, 2) =1.97516316,A(1, 3) = 1.26132015; A(1, 4) =0.98084521;
-    A(2, 0) = 1.79536083; A(2, 1) = 1.97516316; A(2, 2) =3.13313591,A(2, 3) = 1.72909781; A(3, 4) = 1.49689227;
-    A(3, 0) = 0.94927581; A(3, 1) = 1.26132015; A(3, 2) = 1.72909781,A(3, 3) = 1.30972456; A(3, 4) =0.96960399;
-    A(4, 0) = 0.77399403; A(4, 1) =0.98084521 ; A(4, 2) = 1.49689227, A(4, 3) = 0.96960399; A(4, 4) =0.9898318;
+	Eigen::MatrixXf TestMatrix(size, size);
+	Eigen::MatrixXf L(size, size);
+	Eigen::MatrixXf D(size, size);
+	Eigen::MatrixXf LDLt(size, size);
+	TestMatrix.setRandom();
+	TestMatrix = TestMatrix.transpose() * TestMatrix; // make it symmetrical
 
-    ldlt(A, ...) / return L, D
-    // A - L * D * L^T = zero matirx;
-    
+	std::shared_ptr<Halide::Buffer<float>> pLBuffer(new Halide::Buffer<float>(size, size));
+	std::shared_ptr<Halide::Buffer<float>> pDBuffer(new Halide::Buffer<float>(size, size));
+	std::shared_ptr<Halide::Buffer<float>> pTestMatrixBuffer(new Halide::Buffer<float>(size, size));
+
+	for (int row = 0; row < size; row++) {
+		for (int col = 0; col < size; col++) {
+			(*pTestMatrixBuffer)(row, col) = TestMatrix(row, col);
+		}
+	}
+
+	CholeskyDecomposition(pTestMatrixBuffer, pLBuffer, pDBuffer);
+
+	for (int row = 0; row < size; row++) {
+		for (int col = 0; col < size; col++) {
+			L(row, col) = (*pLBuffer)(row, col);
+			D(row, col) = (*pDBuffer)(row, col);
+		}
+	}
+	LDLt = L * D * L.transpose();
+	for (int row = 0; row < size; row++) {
+		for (int col = 0; col < size; col++) {
+			CHECK(std::abs(LDLt(row, col) - TestMatrix(row, col)) < 0.00001f );
+		}
+	}
 }
- 
-int main(int argc, char **argv) {
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
-
